@@ -18,7 +18,7 @@ class motd (
     path    => $motd_file,
     owner   => 'root',
     group   => 'root',
-    mode    => '0700',
+    mode    => '0644',
     content => template('motd/motd.erb'),
   }
 }
