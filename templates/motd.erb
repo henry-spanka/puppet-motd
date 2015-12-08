@@ -1,0 +1,156 @@
+#!/bin/bash
+USER=`whoami`
+HOSTNAME=`uname -n`
+
+MEMORY1=`free -t -m | grep "buffers/cache" | awk '{print $3" MB";}'`
+MEMORY2=`free -t -m | grep "Mem" | awk '{print $2" MB";}'`
+MEMPERC=`free | awk 'FNR == 3 {print $3/($3+$4)*100}' | awk -F "." '{print $1}'`
+SWAP=`free -m | tail -n 1 | awk '{print $3}'`
+
+# time of day
+HOUR=$(date +"%H")
+if [ $HOUR -lt 12  -a $HOUR -ge 0 ]
+then    TIME="morning"
+elif [ $HOUR -lt 17 -a $HOUR -ge 12 ] 
+then    TIME="afternoon"
+else 
+    TIME="evening"
+fi
+
+#System uptime
+uptime=`cat /proc/uptime | cut -f1 -d.`
+upDays=$((uptime/60/60/24))
+upHours=$((uptime/60/60%24))
+upMins=$((uptime/60%60))
+upSecs=$((uptime%60))
+
+#System load
+LOAD1=`cat /proc/loadavg | awk {'print $1'}`
+LOAD5=`cat /proc/loadavg | awk {'print $2'}`
+LOAD15=`cat /proc/loadavg | awk {'print $3'}`
+LOAD=`cat /proc/loadavg | awk {'print $1'} | awk -F "." '{print $1}'`
+CPURATIO=`nproc | awk '{print $1/2}'`
+CPUS=`nproc`
+
+#Interfaces
+INTERFACE=$(ip -4 ad | grep 'state UP' | awk -F ":" '!/^[0-9]*: ?lo/ {print $2}')
+
+#Partitions
+PARTITIONS=$(df -Ph | grep -vE "^Filesystem|shm|boot" |  awk '{ print $6}')
+
+#Packages
+PACKAGES="<%= @packages %>"
+
+#Information
+INFO="<%= @important %>"
+
+echo -e "
+\033[01;35mGood $TIME \033[01;36m$USER
+
+\033[01;33m◢ HOST INFO ◣ \e[0m
+\033[00;35m► Hostname............:\033[02;37m $HOSTNAME
+\033[00;35m► Release.............:\033[02;37m `cat /etc/redhat-release`
+\033[00;35m► Users...............:\033[02;37m Currently `users | wc -w` user(s) logged on\e[0m
+
+\033[01;33m◢ SYSTEM INFO ◣ \e[0m"
+if [ $LOAD -gt $CPURATIO ] 
+  then
+    if [ $LOAD -gt $CPUS  ]
+    then
+      #load usage over 90% -> critical
+      echo -e "\033[00;35m► CPU usage...........:\033[00;31m $LOAD1, $LOAD5, $LOAD15 (1, 5, 15 min)"
+    else
+      #load usage between 80% and 90% -> warning
+      echo -e "\033[00;35m► CPU usage...........:\033[01;33m $LOAD1, $LOAD5, $LOAD15 (1, 5, 15 min)"
+    fi
+  else
+    #load usage bellow 80% -> good
+    echo -e "\033[00;35m► CPU usage...........:\033[00;32m $LOAD1, $LOAD5, $LOAD15 (1, 5, 15 min)"
+fi
+if [ $MEMPERC -gt 80  ]
+  then
+    if [ $MEMPERC -gt 90  ]
+    then
+      #memory usage over 90% -> critical
+      echo -e "\033[00;35m► Memory used.........:\033[00;31m $MEMORY1 of $MEMORY2 in use"
+    else
+      #memory usage between 80% and 90% -> warning
+      echo -e "\033[00;35m► Memory used.........:\033[01;33m $MEMORY1 of $MEMORY2 in use"
+    fi
+  else
+    #memory usage bellow 80% -> good
+    echo -e "\033[00;35m► Memory used.........:\033[00;32m $MEMORY1 of $MEMORY2 in use"
+fi
+if [ $SWAP -ne "0"  ]
+then
+	echo -e "\033[00;35m► Swap in use.........:\033[02;37m `free -m | tail -n 1 | awk '{print $3}'` MB"
+else
+	echo -e "\033[00;35m► Swap in use.........:\033[00;31m no swap partition"
+fi
+echo -e "\033[00;35m► Processor(s)........:\033[02;37m `nproc`x `grep "model name" /proc/cpuinfo | uniq | awk -F ": " '{print $2}'`
+\033[00;35m► System uptime.......:\033[02;37m $upDays days $upHours hours $upMins minutes $upSecs seconds"
+if [ -n "$PACKAGES" ];
+then
+        echo -e "\033[00;35m► Installaed packages.:\033[02;37m $PACKAGES"
+fi
+
+echo -e "
+\033[01;33m◢ NETWORK INFO ◣ \033[02;37m"
+for x in $INTERFACE
+do
+        MAC=$(ip ad show dev $x |grep link/ether |awk '{print $2}')
+        IP=$(ip ad show dev $x |grep -v inet6 | grep inet|awk '{print $2}')
+        printf  "\033[00;35m► Interface "$x"......:\033[02;37m "$IP"\e[0m\t\n"
+done
+echo -e "
+\033[01;33m◢ PARTITION INFO ◣ \033[02;37m"
+for x in $PARTITIONS
+do
+        PART_PATH=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $1}')
+        PART_SIZE=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $2}')
+        PART_USED=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $3}')
+        PART_AVAI=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $4}')
+	PART_PERC=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $5}' |awk -F "%" '{print $1}')
+        PART_NAME=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $6}')
+	printf  "\033[00;35m► Partition "$PART_PATH":\t\n"
+        printf  "  \033[00;35mSize\t Free\t Used\t Mount\n"
+        if [ $PART_PERC -gt 80  ]
+        then
+                if [ $PART_PERC -gt 90  ]
+                then
+                        #partition over 90% -> critical
+                        printf  "  \033[00;31m"$PART_SIZE"\t "$PART_AVAI"\t "$PART_USED"\t "$PART_NAME"\n"
+                else
+                        #partition usage between 80% and 90% -> warning
+                        printf  "  \033[01;33m"$PART_SIZE"\t "$PART_AVAI"\t "$PART_USED"\t "$PART_NAME"\n"
+                fi
+        else
+                #partition usage bellow 80% -> good
+                printf  "  \033[00;32m"$PART_SIZE"\t "$PART_AVAI"\t "$PART_USED"\t "$PART_NAME"\n"
+        fi
+done
+if [ -n "$PACKAGES" ];
+then
+	echo -e "\n\033[01;33m◢ PACKAGE INFO ◣ \033[02;37m"
+	for x in $PACKAGES
+	do
+        	PACK_INFO=$(rpm -q $x)
+	        printf  "\033[00;35m►\033[02;37m "$PACK_INFO"\e[0m\n"
+	done
+fi
+if [ -n "$INFO" ];
+then
+        echo -e "\n\033[01;33m◢ IMPORTANT INFO ◣ \e[0m";
+OIFS="${IFS}"
+NIFS=$'\n'
+ 
+IFS="${NIFS}"
+ 
+for LINE in ${INFO} ; do
+    IFS="${OIFS}"
+    echo -e "\033[00;35m►\033[00;31m ${LINE}"
+    IFS="${NIFS}"
+done
+IFS="${OIFS}"
+fi
+echo -e "\e[0m"

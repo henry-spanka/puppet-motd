@@ -1,0 +1,32 @@
+{
+  "name": "fnxdotlu-motd",
+  "version": "1.1.0",
+  "author": "fnxdotlu",
+  "summary": "Detailed MOTD (message of the day) module",
+  "license": "Apache 2.0",
+  "source": "http://puppet.fnx.lu/modules/fnxdotlu-motd",
+  "tags": [
+    "motd"
+  ],
+  "operatingsystem_support": [
+    {
+      "operatingsystem": "RedHat",
+      "operatingsystemrelease": [
+        "5.0",
+        "6.0"
+      ]
+    },
+    {
+      "operatingsystem": "CentOS",
+      "operatingsystemrelease": [
+        "5.0",
+        "6.0"
+      ]
+    }
+  ],
+  "project_page": null,
+  "issues_url": null,
+  "dependencies": [
+    {"version_requirement":">= 1.1.0","name":"puppetlabs-stdlib"}
+  ]
+}
