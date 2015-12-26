@@ -106,6 +106,9 @@ echo -e "
 \033[01;33m◢ PARTITION INFO ◣ \033[02;37m"
 for x in $PARTITIONS
 do
+	# Do not display mounted OpenVZ containers
+	if [[ $x =~ ^\/var\/lib\/vz\/root\/[0-9]+ ]]; then continue; fi;
+
         PART_PATH=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $1}')
         PART_SIZE=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $2}')
         PART_USED=$(df -Ph $x | grep -v "Filesystem"  |awk '{print $3}')
